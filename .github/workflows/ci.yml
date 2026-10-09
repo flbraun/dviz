@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+      - run: npm run build
+      - uses: actions/upload-artifact@v5
+        with:
+          name: web-dist
+          path: web/dist/
+          include-hidden-files: true
+
+  go:
+    needs: web
+    runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: "0"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - uses: actions/download-artifact@v5
+        with:
+          name: web-dist
+          path: web/dist/
+      - run: go vet ./...
+      - run: test -z "$(gofmt -l .)"
+      - name: Build static binary
+        run: |
+          go build -trimpath -ldflags "-s -w" -o dviz ./cmd/dviz
+          file dviz | tee /dev/stderr | grep -q "statically linked"
+      - name: Test (unit + integration against the runner's Docker daemon)
+        run: go test -count=1 -timeout 15m ./...
+      - uses: actions/upload-artifact@v5
+        with:
+          name: dviz
+          path: dviz
+
+  e2e:
+    needs: go
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: actions/download-artifact@v5
+        with:
+          name: dviz
+          path: bin/
+      - run: chmod +x ../bin/dviz
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test
+        env:
+          DVIZ_BIN: ${{ github.workspace }}/bin/dviz
+      - uses: actions/upload-artifact@v5
+        if: failure()
+        with:
+          name: playwright-report
+          path: web/playwright-report/
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: docker build -t dviz:ci .
