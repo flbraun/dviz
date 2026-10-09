@@ -15,7 +15,9 @@
       .filter((n) => !hidden.has(n.kind) && !(app.hideStopped && isStopped(n)))
       .filter((n) => n.name.toLowerCase().includes(q) || n.id.toLowerCase().includes(q))
       .sort((a, b) => a.name.localeCompare(b.name))
-      .slice(0, LIMIT);
+      .slice(0, LIMIT)
+      // Store nodes are mutated in place; copies make status changes re-render.
+      .map((n) => ({ ...n }));
   });
 </script>
 

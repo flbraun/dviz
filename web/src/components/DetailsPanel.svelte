@@ -11,9 +11,11 @@
   let entity = $state<Entity | null>(null);
   let error = $state<string | null>(null);
 
+  // Store nodes are mutated in place to keep their layout; copy so changes propagate.
   const node = $derived.by(() => {
     void app.graph?.version;
-    return app.selectedId ? (app.graph?.nodes.get(app.selectedId) ?? null) : null;
+    const n = app.selectedId ? app.graph?.nodes.get(app.selectedId) : undefined;
+    return n ? { ...n } : null;
   });
   // Refetch when the selection or its live state changes.
   const refreshKey = $derived(node ? `${node.id}|${node.status}|${JSON.stringify(node.attrs ?? {})}` : null);
