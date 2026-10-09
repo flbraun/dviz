@@ -201,3 +201,7 @@ The container details' **Network** tab lists every reachable peer with the DNS n
   - healthcheck output
   - attributes of Docker events
 - **What is not stripped.** Image history is never fetched. Command lines, labels and container logs are shown as Docker reports them, so don't put secrets there.
+
+## AI disclosure
+
+This app's code is entirely written by AI. All changes are reviewed, tested and fully understood by human maintainers before they end up in a public release.
