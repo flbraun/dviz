@@ -17,8 +17,8 @@ jobs:
       run:
         working-directory: web
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 26
           cache: npm
@@ -27,7 +27,7 @@ jobs:
       - run: npm run check
       - run: npm test
       - run: npm run build
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: web-dist
           path: web/dist/
@@ -39,11 +39,11 @@ jobs:
     env:
       CGO_ENABLED: "0"
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v8
         with:
           name: web-dist
           path: web/dist/
@@ -55,7 +55,7 @@ jobs:
           file dviz | tee /dev/stderr | grep -q "statically linked"
       - name: Test (unit + integration against the runner's Docker daemon)
         run: go test -count=1 -timeout 15m ./...
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: dviz
           path: dviz
@@ -67,13 +67,13 @@ jobs:
       run:
         working-directory: web
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 26
           cache: npm
           cache-dependency-path: web/package-lock.json
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v8
         with:
           name: dviz
           path: bin/
@@ -83,7 +83,7 @@ jobs:
       - run: npx playwright test
         env:
           DVIZ_BIN: ${{ github.workspace }}/bin/dviz
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: playwright-report
@@ -92,5 +92,5 @@ jobs:
   docker:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - run: docker build -t dviz:ci .

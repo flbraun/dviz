@@ -106,10 +106,13 @@ type ctr struct {
 	Labels   map[string]string
 	Networks map[string]*network.EndpointSettings
 	Host     *container.HostConfig
-	Tty      bool
-	Health   *container.HealthConfig
-	NoStart  bool
-	Image    string
+	// Expose lists container ports to declare, as `docker run -p` does for every published
+	// port. Docker < 29 ignores port bindings of undeclared ports.
+	Expose  []string
+	Tty     bool
+	Health  *container.HealthConfig
+	NoStart bool
+	Image   string
 }
 
 // run creates and starts a container and registers its removal.
@@ -126,6 +129,13 @@ func run(t *testing.T, c *client.Client, spec ctr) string {
 	if hc == nil {
 		hc = &container.HostConfig{}
 	}
+	var exposed network.PortSet
+	for _, p := range spec.Expose {
+		if exposed == nil {
+			exposed = network.PortSet{}
+		}
+		exposed[network.MustParsePort(p)] = struct{}{}
+	}
 	var nc *network.NetworkingConfig
 	if len(spec.Networks) > 0 {
 		nc = &network.NetworkingConfig{EndpointsConfig: spec.Networks}
@@ -138,7 +148,7 @@ func run(t *testing.T, c *client.Client, spec ctr) string {
 	}
 	res, err := c.ContainerCreate(ctx, client.ContainerCreateOptions{
 		Name:             spec.Name,
-		Config:           &container.Config{Image: spec.Image, Cmd: spec.Cmd, Env: spec.Env, Labels: labels(spec.Labels), Tty: spec.Tty, Healthcheck: spec.Health},
+		Config:           &container.Config{Image: spec.Image, Cmd: spec.Cmd, Env: spec.Env, Labels: labels(spec.Labels), Tty: spec.Tty, Healthcheck: spec.Health, ExposedPorts: exposed},
 		HostConfig:       hc,
 		NetworkingConfig: nc,
 	})
