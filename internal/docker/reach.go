@@ -273,9 +273,14 @@ func dnsNames(ep *network.EndpointSettings, c *container.Summary) []string {
 		set[n] = true
 	}
 	if len(set) == 0 {
+		// The list endpoint omits DNS names; approximate them. Details resolve the real
+		// names by inspecting the peer.
 		set[ContainerName(*c)] = true
 		for _, a := range ep.Aliases {
 			set[a] = true
+		}
+		if s := c.Labels[LabelComposeService]; s != "" {
+			set[s] = true
 		}
 	}
 	return sortedKeys(set)

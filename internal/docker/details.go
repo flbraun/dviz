@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/moby/moby/api/types/swarm"
@@ -327,6 +328,7 @@ func containerDetails(ctx context.Context, r *Reader, in *Inputs, id string) (an
 	if d.Peers == nil {
 		d.Peers = []Peer{}
 	}
+	resolvePeerNames(ctx, r, d.Peers)
 	if s := c.State; s != nil {
 		d.State = ContainerState{Status: string(s.Status), Running: s.Running, ExitCode: s.ExitCode, Error: s.Error,
 			OOMKilled: s.OOMKilled, StartedAt: s.StartedAt, FinishedAt: s.FinishedAt}
@@ -403,6 +405,39 @@ func containerDetails(ctx context.Context, r *Reader, in *Inputs, id string) (an
 		sort.Slice(d.NetNSSharers, func(i, j int) bool { return d.NetNSSharers[i].Name < d.NetNSSharers[j].Name })
 	}
 	return d, nil
+}
+
+// maxPeerInspects bounds the inspect calls made to resolve peer DNS names.
+const maxPeerInspects = 100
+
+// resolvePeerNames replaces the list-derived DNS names of peers with the authoritative
+// per-network DNS names from inspecting each peer; the list endpoint omits aliases.
+func resolvePeerNames(ctx context.Context, r *Reader, peers []Peer) {
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, 8)
+	for i := range peers {
+		if i >= maxPeerInspects {
+			break
+		}
+		wg.Add(1)
+		go func(p *Peer) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			c, err := r.Container(ctx, strings.TrimPrefix(p.ID, "container/"))
+			if err != nil || c.NetworkSettings == nil {
+				return
+			}
+			for j := range p.Networks {
+				pn := &p.Networks[j]
+				if ep := c.NetworkSettings.Networks[pn.Network]; ep != nil && pn.DNS && len(ep.DNSNames) > 0 {
+					pn.Names = append([]string(nil), ep.DNSNames...)
+					sort.Strings(pn.Names)
+				}
+			}
+		}(&peers[i])
+	}
+	wg.Wait()
 }
 
 func networkDetails(ctx context.Context, r *Reader, in *Inputs, id string) (any, error) {
