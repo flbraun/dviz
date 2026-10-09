@@ -19,7 +19,8 @@ FROM scratch
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=build /out/dviz /dviz
 # A config file is required: mount it at /dviz.yml (the working directory is /) or
-# /etc/dviz/dviz.yml, with listen: 0.0.0.0:8080 to be reachable through -p.
+# /etc/dviz/dviz.yml, with listen: 0.0.0.0:8080 to be reachable through -p and
+# headless: true (the image has no browser or xdg-open).
 # Access to the Docker socket needs its group:
 #   --group-add "$(stat -c %g /var/run/docker.sock)"
 USER 65534:65534

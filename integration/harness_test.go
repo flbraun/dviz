@@ -173,6 +173,7 @@ type instance struct {
 	candidates []string // cwd, home, etc
 	mu         sync.Mutex
 	addrs      []string
+	opened     []string // URLs dviz asked to open in a browser
 	cancel     context.CancelFunc
 	done       chan error
 }
@@ -207,6 +208,13 @@ func (in *instance) launch() {
 		in.done <- app.Run(ctx, app.Options{
 			Candidates: in.candidates,
 			Assets:     fstest.MapFS{"index.html": {Data: []byte("<!doctype html><title>dviz</title>")}},
+			// Never launch a real browser from tests; record the request instead.
+			OpenBrowser: func(url string) error {
+				in.mu.Lock()
+				in.opened = append(in.opened, url)
+				in.mu.Unlock()
+				return nil
+			},
 			OnListen: func(addr string) {
 				in.mu.Lock()
 				in.addrs = append(in.addrs, addr)

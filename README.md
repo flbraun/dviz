@@ -19,7 +19,9 @@ hosts:
 ./dviz                        # with dviz.yml in the current directory; serves http://127.0.0.1:8080
 ```
 
-With Docker, mount the config at `/dviz.yml` and set `listen: 0.0.0.0:8080` in it so the published port reaches dviz:
+On start, dviz opens the UI in a new browser tab via `xdg-open`; set `headless: true` to disable that.
+
+With Docker, mount the config at `/dviz.yml` and set `listen: 0.0.0.0:8080` (so the published port reaches dviz) and `headless: true` (there is no browser in the container) in it:
 
 ```sh
 docker build -t dviz .
@@ -89,6 +91,7 @@ The file is also validated at startup, and an invalid file prevents startup.
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
 | `listen` | string | `127.0.0.1:8080` | Address to serve on, as `host:port`. The host must be an IP address or `localhost` (empty means all interfaces). Port `0` picks a free port. When `host` is a loopback address, requests whose `Host` header isn't a loopback name are rejected (DNS-rebinding protection). |
+| `headless` | bool | `false` | When `false`, dviz opens the UI in a new browser tab via `xdg-open` once at startup. Wildcard listen addresses are opened as `localhost`. If `xdg-open` is missing or fails, dviz logs a warning and keeps running. Changing it while dviz runs has no effect until the next start. |
 | `hosts` | list | one host: `local` → `unix:///var/run/docker.sock` | Docker daemons to show, one scene each, in this order. An empty or missing list uses the default. |
 | `hosts[].name` | string | — (required) | Stable identifier used in URLs (`#/<name>`). Must match `^[a-z0-9][a-z0-9_-]*$` and be unique. |
 | `hosts[].display_name` | string | `name` | Human-readable label shown in the UI. |
@@ -161,6 +164,7 @@ Inside the Docker image (mounted at `/dviz.yml`):
 
 ```yaml
 listen: 0.0.0.0:8080
+headless: true
 hosts:
   - name: local
     url: unix:///var/run/docker.sock

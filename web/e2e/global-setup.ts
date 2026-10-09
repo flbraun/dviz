@@ -84,6 +84,7 @@ async function setup(run: string, label: string, cleanup: () => void): Promise<(
   writeFileSync(
     join(dir, "dviz.yml"),
     `listen: 127.0.0.1:0
+headless: true
 hosts:
   - name: local
     display_name: "Local daemon"

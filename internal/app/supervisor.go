@@ -25,6 +25,8 @@ type Options struct {
 	Assets fs.FS
 	// OnListen, if set, is called with the bound address whenever a listener starts.
 	OnListen func(addr string)
+	// OpenBrowser opens a URL in the user's browser; defaults to xdg-open.
+	OpenBrowser func(url string) error
 }
 
 // Run serves dviz until ctx is done.
@@ -45,6 +47,18 @@ func Run(ctx context.Context, opts Options) error {
 		return err
 	}
 	defer func() { ln.stop() }()
+
+	// Only at startup: config reloads (including listen changes) never open new tabs.
+	if !cfg.Headless {
+		open := opts.OpenBrowser
+		if open == nil {
+			open = xdgOpen
+		}
+		url := browserURL(ln.addr)
+		if err := open(url); err != nil {
+			slog.Warn("cannot open browser; set headless: true to skip this", "url", url, "err", err)
+		}
+	}
 
 	updates := make(chan *config.Config)
 	watchErr := make(chan error, 1)

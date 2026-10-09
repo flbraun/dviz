@@ -29,7 +29,9 @@ const (
 // Config is the complete application configuration.
 type Config struct {
 	Listen string `yaml:"listen"`
-	Hosts  []Host `yaml:"hosts"`
+	// Headless disables opening the frontend in a browser tab at startup.
+	Headless bool   `yaml:"headless"`
+	Hosts    []Host `yaml:"hosts"`
 
 	// Source is the file the config was loaded from; empty when defaults are used.
 	Source string `yaml:"-"`

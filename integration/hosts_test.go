@@ -199,6 +199,36 @@ func TestConfigRequired(t *testing.T) {
 	}
 }
 
+func TestOpenBrowser(t *testing.T) {
+	daemon(t)
+	opened := func(in *instance) []string {
+		in.mu.Lock()
+		defer in.mu.Unlock()
+		return append([]string(nil), in.opened...)
+	}
+
+	in := start(t, localYAML())
+	if got := opened(in); len(got) != 1 || got[0] != in.base()+"/" {
+		t.Fatalf("headless unset: opened %v, want [%s/]", got, in.base())
+	}
+	// Reloads, including a listen change, never open another tab.
+	in.write(0, strings.Replace(localYAML(), "listen: 127.0.0.1:0", "listen: 127.0.0.2:0", 1))
+	eventually(t, 10*time.Second, func() string {
+		if !strings.HasPrefix(in.base(), "http://127.0.0.2:") {
+			return "listener not moved"
+		}
+		return ""
+	})
+	if got := opened(in); len(got) != 1 {
+		t.Errorf("reload opened another tab: %v", got)
+	}
+
+	headless := start(t, "headless: true\n"+localYAML())
+	if got := opened(headless); len(got) != 0 {
+		t.Errorf("headless: true opened %v", got)
+	}
+}
+
 func TestHostHeaderGuard(t *testing.T) {
 	daemon(t)
 	in := start(t, localYAML())
