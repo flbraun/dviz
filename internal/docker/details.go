@@ -389,7 +389,9 @@ func containerDetails(ctx context.Context, r *Reader, in *Inputs, id string) (an
 			d.Networks = append(d.Networks, e)
 		}
 	}
-	sort.Slice(d.Ports, func(i, j int) bool { return d.Ports[i].Container+d.Ports[i].HostIP < d.Ports[j].Container+d.Ports[j].HostIP })
+	sort.Slice(d.Ports, func(i, j int) bool {
+		return d.Ports[i].Container+d.Ports[i].HostIP < d.Ports[j].Container+d.Ports[j].HostIP
+	})
 	sort.Slice(d.Networks, func(i, j int) bool { return d.Networks[i].Network < d.Networks[j].Network })
 
 	x := newReachIndex(in)
