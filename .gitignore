@@ -1,0 +1,12 @@
+# build output
+/dviz
+/web/dist/*
+!/web/dist/.gitkeep
+
+# frontend
+/web/node_modules/
+/web/test-results/
+/web/playwright-report/
+
+# local config
+/dviz.yml
