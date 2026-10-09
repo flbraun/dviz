@@ -37,7 +37,7 @@ npm --prefix web run check && npm --prefix web test       # svelte-check + vites
 npm --prefix web run e2e                                 # Playwright (needs Docker, Chromium)
 ```
 
-Releases are cut by pushing a `vX.Y.Z` tag (see `.github/workflows/release.yml`; it calls `ci.yml` first). Keep release builds stamping `-X main.version`.
+Releases are cut by pushing a `vX.Y.Z` tag (see `.github/workflows/release.yml`; it validates the tag, then calls `ci.yml`). Keep release builds stamping `-X main.version`.
 
 The integration tests and e2e tests create fixtures labelled `dviz.test.run` / `dviz.e2e.run`. They also start a privileged `docker:dind` container (second tcp+TLS host) and an Alpine `sshd` container that exposes the local socket (SSH host). They clean up after themselves.
 
@@ -58,6 +58,10 @@ The integration tests and e2e tests create fixtures labelled `dviz.test.run` / `
 - **Keep the DTOs in sync.** When a Go DTO changes, update `web/src/lib/types.ts` in the same change.
 - **Never expose environment variables.** Not even their names: no DTO field, no UI. dviz shows infrastructure, not what runs inside containers. The read-boundary stripping in `sanitize.go` stays as an extra safety layer.
 - **Never discover credentials automatically.** SSH hosts authenticate only with the configured `ssh.method` (`password`, `agent` or `key`). Don't scan `~/.ssh` or fall back to other methods.
+- **Versioning follows [SemVer 2.0.0](https://semver.org/spec/v2.0.0.html).** Tags are `v` + a valid SemVer version.
+  - Breaking changes (config keys or semantics, API responses, removed features) bump MAJOR. Mark them `!` / `BREAKING CHANGE` in the commit.
+  - Backwards-compatible features bump MINOR; fixes bump PATCH.
+  - Before 1.0.0, breaking changes bump MINOR instead.
 - **Use Conventional Commits** (`feat(scope): …`, `fix: …`, `test: …`, `docs: …`, `build: …`, `ci: …`, `chore: …`, `refactor: …`).
 
 ## Frontend notes

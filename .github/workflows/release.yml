@@ -12,8 +12,23 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  semver:
+    # Versions follow Semantic Versioning 2.0.0; tags are v + a valid SemVer version.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate tag
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          re='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-((0|[1-9][0-9]*|[0-9]*[a-zA-Z-][0-9a-zA-Z-]*)(\.(0|[1-9][0-9]*|[0-9]*[a-zA-Z-][0-9a-zA-Z-]*))*))?(\+([0-9a-zA-Z-]+(\.[0-9a-zA-Z-]+)*))?$'
+          if [[ ! "$TAG" =~ $re ]]; then
+            echo "::error::Tag '$TAG' is not v + a Semantic Versioning 2.0.0 version (e.g. v1.4.2, v2.0.0-rc.1)."
+            exit 1
+          fi
+
   ci:
     # Full CI (checks, unit, integration and e2e tests) must pass before anything is published.
+    needs: semver
     uses: ./.github/workflows/ci.yml
     permissions:
       contents: read
@@ -55,8 +70,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # A SemVer prerelease has a "-" before any "+build" metadata.
+          core="${VERSION%%+*}"
           prerelease=""
-          [[ "$VERSION" == *-* ]] && prerelease="--prerelease"
+          [[ "$core" == *-* ]] && prerelease="--prerelease"
           if gh release view "$VERSION" >/dev/null 2>&1; then
             gh release upload "$VERSION" dist/* --clobber
           else
@@ -79,10 +96,13 @@ jobs:
         run: |
           image="ghcr.io/${GITHUB_REPOSITORY,,}"
           version="${VERSION#v}"
-          tags=(-t "$image:$version")
-          # Stable releases (no "-pre" suffix) also move the major, minor and latest tags.
-          if [[ "$version" =~ ^([0-9]+)\.([0-9]+)\.[0-9]+$ ]]; then
-            tags+=(-t "$image:${BASH_REMATCH[1]}.${BASH_REMATCH[2]}" -t "$image:${BASH_REMATCH[1]}" -t "$image:latest")
+          # Docker tags cannot contain "+"; SemVer build metadata is kept with "_" instead.
+          tags=(-t "$image:${version//+/_}")
+          # Stable releases (no prerelease part) also move the major, minor and latest tags.
+          if [[ "${version%%+*}" =~ ^([0-9]+)\.([0-9]+)\.[0-9]+$ ]]; then
+            tags+=(-t "$image:${BASH_REMATCH[1]}.${BASH_REMATCH[2]}" -t "$image:latest")
+            # In 0.y.z any minor release may break compatibility, so there is no "0" tag.
+            [[ "${BASH_REMATCH[1]}" != 0 ]] && tags+=(-t "$image:${BASH_REMATCH[1]}")
           fi
           docker buildx create --use --driver docker-container
           docker buildx build . --push \

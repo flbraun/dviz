@@ -82,12 +82,19 @@ npx --prefix web playwright install chromium
 npm --prefix web run e2e                    # Playwright against the real binary, local daemon and dind
 ```
 
-**Releases.** Pushing a tag `vX.Y.Z` runs `.github/workflows/release.yml`:
+**Versioning.** dviz follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html). Release tags are `v` followed by a SemVer version, e.g. `v1.4.2` or `v2.0.0-rc.1`. From 1.0.0 on:
+- **MAJOR** means breaking changes for users: removed or changed config keys or semantics, changed API responses, removed features. Commits marked `!` / `BREAKING CHANGE`.
+- **MINOR** means backwards-compatible features.
+- **PATCH** means backwards-compatible fixes.
+
+Before 1.0.0, any `0.y` release may break compatibility; `0.y.z` patch releases stay compatible.
+
+**Releases.** Pushing a tag `vX.Y.Z` runs `.github/workflows/release.yml`. It rejects tags that aren't valid SemVer.
 1. It runs the full CI first.
 2. It builds the four binaries and attaches them to a GitHub release for the tag.
-3. It pushes the image to `ghcr.io/flbraun/dviz` as `X.Y.Z`, `X.Y`, `X` and `latest`.
+3. It pushes the image to `ghcr.io/flbraun/dviz` as `X.Y.Z`, `X.Y`, `X` and `latest`. There is no `0` tag, because 0.y releases may break compatibility.
 
-Tags with a suffix (`v1.2.0-rc.1`) become prereleases and only get their exact image tag.
+SemVer prereleases (`v1.2.0-rc.1`) become GitHub prereleases and only get their exact image tag. Build metadata (`+…`) appears in the image tag as `_…`, since Docker tags can't contain `+`.
 
 Production build (always static, never CGO):
 
