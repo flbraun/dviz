@@ -20,6 +20,7 @@ test("one scene per host with display names and deep links", async ({ page }) =>
   await open(page);
   const tabs = page.getByTestId("host-tab");
   await expect(tabs).toHaveText(["Local daemon", "Docker in Docker"]);
+  await expect(page).toHaveTitle("dviz - Local daemon");
 
   await page.getByLabel("Search entities").fill(process.env.E2E_PREFIX!);
   const results = page.getByTestId("search-result");
@@ -28,6 +29,7 @@ test("one scene per host with display names and deep links", async ({ page }) =>
 
   await tabs.filter({ hasText: "Docker in Docker" }).click();
   await expect(page).toHaveURL(/#\/dind$/);
+  await expect(page).toHaveTitle("dviz - Docker in Docker");
   await expect(results.filter({ hasText: p("dind-only") })).toHaveCount(1);
   await expect(results.filter({ hasText: p("app") })).toHaveCount(0);
 

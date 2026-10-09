@@ -9,6 +9,10 @@
   onMount(() => app.start());
 </script>
 
+<svelte:head>
+  <title>{app.active ? `dviz - ${app.active.displayName}` : "dviz"}</title>
+</svelte:head>
+
 <div class="app">
   <header class="top">
     <h1>dviz</h1>
