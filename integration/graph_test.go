@@ -170,7 +170,7 @@ func TestReachability(t *testing.T) {
 	f := run(t, c, ctr{Name: name(t, "f"), Host: &container.HostConfig{NetworkMode: container.NetworkMode("container:" + a)}})
 	g := run(t, c, ctr{Name: name(t, "g"), Host: &container.HostConfig{NetworkMode: "none"}})
 	port := network.MustParsePort("80/tcp")
-	h := run(t, c, ctr{Name: name(t, "h"), Host: &container.HostConfig{PortBindings: network.PortMap{port: {{HostIP: mustAddr("127.0.0.1")}}}}})
+	h := run(t, c, ctr{Name: name(t, "h"), Expose: []string{"80/tcp"}, Host: &container.HostConfig{PortBindings: network.PortMap{port: {{HostIP: mustAddr("127.0.0.1")}}}}})
 	_ = h
 
 	A, B, C, D, E, F, G, H := docker.ContainerID(a), docker.ContainerID(b), docker.ContainerID(cc), docker.ContainerID(d),
