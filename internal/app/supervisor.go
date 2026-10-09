@@ -120,7 +120,10 @@ func listen(addr string, srv *server.Server, onListen func(string)) (*listener, 
 
 func (l *listener) stop() {
 	l.cancel()
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	// Request contexts are cancelled above, so only short API requests can still be in
+	// flight. Bound the wait: Shutdown otherwise waits up to 5s for connections a client
+	// opened but never used before it treats them as idle.
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	if err := l.srv.Shutdown(ctx); err != nil {
 		_ = l.srv.Close()
