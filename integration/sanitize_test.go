@@ -215,21 +215,19 @@ collect:
 		}
 	}
 
-	// Keys stay visible.
-	var det struct {
-		Data docker.ContainerDetails `json:"data"`
-	}
-	in.get(entityPath("local", docker.ContainerID(id)), &det)
-	for _, k := range []string{"DB_PASSWORD", "PLAIN", "IMAGE_TOKEN"} {
-		if !strings.Contains(strings.Join(det.Data.Env, ","), k) {
-			t.Errorf("env keys %v lack %s", det.Data.Env, k)
+	// Environment variables are not exposed at all, not even their names.
+	for _, body := range bodies {
+		for _, key := range []string{"DB_PASSWORD", "IMAGE_TOKEN", "SERVICE_TOKEN"} {
+			if strings.Contains(body, key) {
+				t.Fatalf("env var name %s exposed: …%s…", key, around(body, key))
+			}
 		}
 	}
 	var svcDet struct {
 		Data docker.ServiceDetails `json:"data"`
 	}
 	in.get(entityPath("dind", docker.ServiceID(svc.ID)), &svcDet)
-	if len(svcDet.Data.Env) != 1 || svcDet.Data.Env[0] != "SERVICE_TOKEN" || len(svcDet.Data.Secrets) != 1 {
+	if len(svcDet.Data.Secrets) != 1 {
 		t.Errorf("service details = %+v", svcDet.Data)
 	}
 }

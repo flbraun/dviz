@@ -143,7 +143,6 @@ export interface ContainerDetails {
   netnsSharers?: Ref[];
   peers: Peer[];
   labels: Record<string, string>;
-  env: string[];
   resources: { memory: number; nanoCpus: number; pidsLimit?: number };
   project?: string;
   service?: string;

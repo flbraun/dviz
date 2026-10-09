@@ -208,7 +208,7 @@ The container details' **Network** tab lists every reachable peer with the DNS n
 - **Docker socket access is root-equivalent.** Anyone who can reach the dviz UI can see everything dviz can see. dviz listens on loopback by default and has no authentication. Put a reverse proxy with authentication in front of it if you expose it.
 - **The API is read-only.** It has no endpoint that changes daemon state.
 - **What is stripped.** Secrets are removed at the read boundary, before any other code sees the data:
-  - environment variable values, for containers, images and services (keys stay visible)
+  - environment variable values, for containers, images and services. The API and UI don't show environment variables at all, not even their names: dviz is about infrastructure, not what runs inside containers.
   - swarm secret and config payloads
   - volume, mount, network-attachment and log driver option values
   - healthcheck output

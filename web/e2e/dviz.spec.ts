@@ -39,13 +39,14 @@ test("one scene per host with display names and deep links", async ({ page }) =>
   await expect(results).toHaveCount(1);
 });
 
-test("container details mask environment values", async ({ page }) => {
+test("container details show infrastructure, not environment variables", async ({ page }) => {
   await open(page);
   await select(page, p("app"));
   await expect(page.getByTestId("container-image")).toHaveText("busybox:1.37");
   await expect(page.getByTestId("container-ports")).toContainText("8080/tcp");
-  await expect(page.getByTestId("container-env")).toContainText("SECRET_TOKEN");
-  expect(await page.content()).not.toContain(process.env.E2E_SECRET!);
+  const html = await page.content();
+  expect(html).not.toContain("SECRET_TOKEN");
+  expect(html).not.toContain(process.env.E2E_SECRET!);
 });
 
 test("logs and stats stream live", async ({ page }) => {

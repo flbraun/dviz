@@ -65,14 +65,6 @@
         none
       {/each}
     </dd>
-    <dt>Env</dt>
-    <dd data-testid="container-env">
-      {#each data.env as key (key)}
-        <div><code>{key}</code> <span class="muted">= ••••</span></div>
-      {:else}
-        none
-      {/each}
-    </dd>
     <dt>Resources</dt>
     <dd>
       memory {data.resources.memory ? formatBytes(data.resources.memory) : "unlimited"} · cpus

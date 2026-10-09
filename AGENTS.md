@@ -54,6 +54,7 @@ The integration tests and e2e tests create fixtures labelled `dviz.test.run` / `
   - Unit tests (vitest) are for non-trivial logic of our own.
 - **Pin exact versions** for npm packages, Docker base images and Go modules.
 - **Keep the DTOs in sync.** When a Go DTO changes, update `web/src/lib/types.ts` in the same change.
+- **Never expose environment variables.** Not even their names: no DTO field, no UI. dviz shows infrastructure, not what runs inside containers. The read-boundary stripping in `sanitize.go` stays as an extra safety layer.
 - **Never discover credentials automatically.** SSH hosts authenticate only with the configured `ssh.method` (`password`, `agent` or `key`). Don't scan `~/.ssh` or fall back to other methods.
 - **Use Conventional Commits** (`feat(scope): …`, `fix: …`, `test: …`, `docs: …`, `build: …`, `ci: …`, `chore: …`, `refactor: …`).
 

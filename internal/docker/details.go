@@ -39,7 +39,6 @@ type ContainerDetails struct {
 	NetNSSharers []Ref              `json:"netnsSharers,omitempty"`
 	Peers        []Peer             `json:"peers"`
 	Labels       map[string]string  `json:"labels"`
-	Env          []string           `json:"env"` // keys only
 	Resources    ContainerResources `json:"resources"`
 	Project      string             `json:"project,omitempty"`
 	Service      string             `json:"service,omitempty"`
@@ -147,7 +146,6 @@ type ImageDetails struct {
 	WorkingDir   string            `json:"workingDir,omitempty"`
 	User         string            `json:"user,omitempty"`
 	ExposedPorts []string          `json:"exposedPorts,omitempty"`
-	Env          []string          `json:"env"` // keys only
 	Labels       map[string]string `json:"labels"`
 }
 
@@ -162,7 +160,6 @@ type ServiceDetails struct {
 	Networks []ServiceNetwork     `json:"networks"`
 	Secrets  []SwarmFileReference `json:"secrets"`
 	Configs  []SwarmFileReference `json:"configs"`
-	Env      []string             `json:"env"` // keys only
 	Labels   map[string]string    `json:"labels"`
 	Stack    string               `json:"stack,omitempty"`
 	Created  time.Time            `json:"created"`
@@ -322,7 +319,7 @@ func containerDetails(ctx context.Context, r *Reader, in *Inputs, id string) (an
 	d := ContainerDetails{
 		ID: c.ID, Name: strings.TrimPrefix(c.Name, "/"), ImageID: c.Image, Created: c.Created,
 		Command: append([]string{c.Path}, c.Args...), RestartCount: c.RestartCount,
-		Labels: map[string]string{}, Env: []string{}, Ports: []PortBinding{}, Mounts: []MountInfo{},
+		Labels: map[string]string{}, Ports: []PortBinding{}, Mounts: []MountInfo{},
 		Networks: []EndpointInfo{}, Peers: in.Peers(c.ID),
 	}
 	if d.Peers == nil {
@@ -341,9 +338,6 @@ func containerDetails(ctx context.Context, r *Reader, in *Inputs, id string) (an
 		d.Image, d.Hostname, d.User, d.WorkingDir, d.Tty = cfg.Image, cfg.Hostname, cfg.User, cfg.WorkingDir, cfg.Tty
 		if cfg.Labels != nil {
 			d.Labels = cfg.Labels
-		}
-		if cfg.Env != nil {
-			d.Env = cfg.Env
 		}
 		d.Project = cfg.Labels[LabelComposeProject]
 		d.Service = cfg.Labels[LabelComposeService]
@@ -483,12 +477,9 @@ func imageDetails(ctx context.Context, r *Reader, id string) (any, error) {
 		return nil, fmt.Errorf("%w: %v", ErrNotFound, err)
 	}
 	d := ImageDetails{ID: img.ID, Tags: img.RepoTags, Digests: img.RepoDigests, Created: img.Created, Size: img.Size,
-		Arch: img.Architecture, OS: img.Os, Author: img.Author, Env: []string{}, Labels: map[string]string{}}
+		Arch: img.Architecture, OS: img.Os, Author: img.Author, Labels: map[string]string{}}
 	if cfg := img.Config; cfg != nil {
 		d.Entrypoint, d.Cmd, d.WorkingDir, d.User = cfg.Entrypoint, cfg.Cmd, cfg.WorkingDir, cfg.User
-		if cfg.Env != nil {
-			d.Env = cfg.Env
-		}
 		if cfg.Labels != nil {
 			d.Labels = cfg.Labels
 		}
@@ -499,7 +490,7 @@ func imageDetails(ctx context.Context, r *Reader, id string) (any, error) {
 
 func serviceDetails(in *Inputs, s swarm.Service) ServiceDetails {
 	d := ServiceDetails{ID: s.ID, Name: s.Spec.Name, Mode: serviceMode(s), Labels: s.Spec.Labels, Stack: s.Spec.Labels[LabelStackNamespace],
-		Created: s.CreatedAt, Updated: s.UpdatedAt, Env: []string{}, Ports: []string{}, Networks: []ServiceNetwork{},
+		Created: s.CreatedAt, Updated: s.UpdatedAt, Ports: []string{}, Networks: []ServiceNetwork{},
 		Secrets: []SwarmFileReference{}, Configs: []SwarmFileReference{}}
 	if s.ServiceStatus != nil {
 		d.Running, d.Desired = s.ServiceStatus.RunningTasks, s.ServiceStatus.DesiredTasks
@@ -525,9 +516,6 @@ func serviceDetails(in *Inputs, s swarm.Service) ServiceDetails {
 	}
 	if cs := s.Spec.TaskTemplate.ContainerSpec; cs != nil {
 		d.Image, _, _ = strings.Cut(cs.Image, "@")
-		if cs.Env != nil {
-			d.Env = cs.Env
-		}
 		for _, sr := range cs.Secrets {
 			if sr == nil {
 				continue
