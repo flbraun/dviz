@@ -15,6 +15,7 @@ internal/docker/          the only Docker gateway
   reach.go                network reachability rules + container peers
   details.go              curated per-kind DTOs for the details endpoint
   logs.go, stats.go       log/stat streams
+  ssh.go                  ssh:// hosts: in-process SSH client forwarding the remote Docker socket
 internal/model/           graph types and Diff
 internal/hub/             per-host hub (events -> debounce -> snapshot -> diff -> subscribers), registry
 internal/server/          read-only HTTP API (JSON + SSE), Host-header guard, embedded SPA
@@ -36,7 +37,7 @@ npm --prefix web run check && npm --prefix web test       # svelte-check + vites
 npm --prefix web run e2e                                 # Playwright (needs Docker, Chromium)
 ```
 
-The integration tests and e2e tests create fixtures labelled `dviz.test.run` / `dviz.e2e.run`, and start a privileged `docker:dind` container. They clean up after themselves.
+The integration tests and e2e tests create fixtures labelled `dviz.test.run` / `dviz.e2e.run`. They also start a privileged `docker:dind` container (second tcp+TLS host) and an Alpine `sshd` container that exposes the local socket (SSH host). They clean up after themselves.
 
 ## Hard rules
 
@@ -53,6 +54,7 @@ The integration tests and e2e tests create fixtures labelled `dviz.test.run` / `
   - Unit tests (vitest) are for non-trivial logic of our own.
 - **Pin exact versions** for npm packages, Docker base images and Go modules.
 - **Keep the DTOs in sync.** When a Go DTO changes, update `web/src/lib/types.ts` in the same change.
+- **Never discover credentials automatically.** SSH hosts authenticate only with the configured `ssh.method` (`password`, `agent` or `key`). Don't scan `~/.ssh` or fall back to other methods.
 - **Use Conventional Commits** (`feat(scope): …`, `fix: …`, `test: …`, `docs: …`, `build: …`, `ci: …`, `chore: …`, `refactor: …`).
 
 ## Frontend notes

@@ -41,7 +41,37 @@ type Host struct {
 	DisplayName string `yaml:"display_name"`
 	URL         string `yaml:"url"`
 	TLS         *TLS   `yaml:"tls"`
+	SSH         *SSH   `yaml:"ssh"`
 }
+
+// SSH holds settings for ssh:// hosts. The URL has the form
+// ssh://[user@]host[:port][/path/to/docker.sock].
+type SSH struct {
+	// Method selects how to authenticate: password, agent or key.
+	Method string `yaml:"method"`
+	// Password is a file holding the login password (method password) or the passphrase of
+	// a protected identity_file (method key).
+	Password string `yaml:"password"`
+	// IdentityFile is the private key used with method key.
+	IdentityFile string `yaml:"identity_file"`
+	// KnownHosts is the known_hosts file used to verify the server; default ~/.ssh/known_hosts.
+	KnownHosts string `yaml:"known_hosts"`
+	// InsecureIgnoreHostKey disables host key verification.
+	InsecureIgnoreHostKey bool `yaml:"insecure_ignore_host_key"`
+}
+
+// SSH authentication methods.
+const (
+	SSHMethodPassword = "password"
+	SSHMethodAgent    = "agent"
+	SSHMethodKey      = "key"
+)
+
+// Default values for ssh:// hosts.
+const (
+	DefaultSSHPort   = "22"
+	DefaultSSHSocket = "/var/run/docker.sock"
+)
 
 // TLS holds client TLS settings for tcp:// hosts.
 type TLS struct {
@@ -129,6 +159,11 @@ func Parse(data []byte, baseDir string) (*Config, error) {
 			t.Cert = resolvePath(baseDir, t.Cert)
 			t.Key = resolvePath(baseDir, t.Key)
 		}
+		if s := c.Hosts[i].SSH; s != nil {
+			s.IdentityFile = resolvePath(baseDir, s.IdentityFile)
+			s.Password = resolvePath(baseDir, s.Password)
+			s.KnownHosts = resolvePath(baseDir, s.KnownHosts)
+		}
 	}
 	return c, nil
 }
@@ -180,6 +215,9 @@ func (h Host) validateURL() error {
 	if err != nil {
 		return fmt.Errorf("url: %w", err)
 	}
+	if h.SSH != nil && u.Scheme != "ssh" {
+		return errors.New("ssh settings are only supported for ssh:// urls")
+	}
 	switch u.Scheme {
 	case "unix":
 		if u.Path == "" {
@@ -195,10 +233,72 @@ func (h Host) validateURL() error {
 		if t := h.TLS; t != nil && (t.Cert == "") != (t.Key == "") {
 			return errors.New("tls: cert and key must be set together")
 		}
+	case "ssh":
+		if h.TLS != nil {
+			return errors.New("tls is not supported for ssh:// urls; ssh encrypts the connection")
+		}
+		if _, hasPassword := u.User.Password(); hasPassword {
+			return fmt.Errorf("url %q: passwords are not supported; use a key or ssh-agent", h.Address())
+		}
+		if u.Hostname() == "" {
+			return fmt.Errorf("url %q: missing host", h.URL)
+		}
+		if p := u.Port(); p != "" {
+			if n, err := strconv.Atoi(p); err != nil || n < 1 || n > 65535 {
+				return fmt.Errorf("url %q: invalid port", h.URL)
+			}
+		}
+		if u.RawQuery != "" || u.Fragment != "" {
+			return fmt.Errorf("url %q: query and fragment are not supported", h.URL)
+		}
+		return h.SSH.validate()
 	default:
-		return fmt.Errorf("url %q: scheme must be unix or tcp", h.URL)
+		return fmt.Errorf("url %q: scheme must be unix, tcp or ssh", h.URL)
 	}
 	return nil
+}
+
+func (s *SSH) validate() error {
+	if s == nil || s.Method == "" {
+		return fmt.Errorf("ssh.method is required for ssh:// urls (%s, %s or %s)", SSHMethodPassword, SSHMethodAgent, SSHMethodKey)
+	}
+	switch s.Method {
+	case SSHMethodPassword:
+		if s.Password == "" {
+			return errors.New("ssh.password (a file containing the password) is required for method password")
+		}
+		if s.IdentityFile != "" {
+			return errors.New("ssh.identity_file is only used with method key")
+		}
+	case SSHMethodAgent:
+		if s.Password != "" || s.IdentityFile != "" {
+			return errors.New("ssh.password and ssh.identity_file are not used with method agent")
+		}
+	case SSHMethodKey:
+		if s.IdentityFile == "" {
+			return errors.New("ssh.identity_file is required for method key")
+		}
+	default:
+		return fmt.Errorf("ssh.method %q must be %s, %s or %s", s.Method, SSHMethodPassword, SSHMethodAgent, SSHMethodKey)
+	}
+	return nil
+}
+
+// SSHTarget returns the user (may be empty), host:port and remote socket path of an ssh:// URL.
+func (h Host) SSHTarget() (user, addr, socket string, err error) {
+	u, err := url.Parse(h.URL)
+	if err != nil || u.Scheme != "ssh" {
+		return "", "", "", fmt.Errorf("not an ssh url: %q", h.URL)
+	}
+	port := u.Port()
+	if port == "" {
+		port = DefaultSSHPort
+	}
+	socket = u.Path
+	if socket == "" || socket == "/" {
+		socket = DefaultSSHSocket
+	}
+	return u.User.Username(), net.JoinHostPort(u.Hostname(), port), socket, nil
 }
 
 // Address returns the URL shown to users: the socket path or tcp address, never credentials.
@@ -207,8 +307,18 @@ func (h Host) Address() string {
 	if err != nil {
 		return ""
 	}
-	if u.Scheme == "unix" {
+	switch u.Scheme {
+	case "unix":
 		return "unix://" + u.Path
+	case "ssh":
+		user, addr, socket, err := h.SSHTarget()
+		if err != nil {
+			return ""
+		}
+		if user != "" {
+			user += "@"
+		}
+		return "ssh://" + user + addr + socket
 	}
 	return "tcp://" + u.Host
 }

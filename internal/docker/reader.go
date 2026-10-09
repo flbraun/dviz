@@ -26,15 +26,28 @@ import (
 
 // Reader is a read-only, sanitizing view of one Docker daemon.
 type Reader struct {
-	c *client.Client
+	c   *client.Client
+	ssh *sshDialer
 }
 
 // Open creates a Reader for the configured host. It does not contact the daemon.
 func Open(h config.Host) (*Reader, error) {
 	opts := []client.Opt{
-		client.WithHost(h.URL),
 		client.WithAPIVersionNegotiation(),
 		client.WithUserAgent("dviz"),
+	}
+	r := &Reader{}
+	if strings.HasPrefix(h.URL, "ssh://") {
+		d, err := newSSHDialer(h)
+		if err != nil {
+			return nil, err
+		}
+		r.ssh = d
+		// Configure the transport like a unix socket client (no proxies), then replace the
+		// dialer with one that reaches the remote socket over SSH.
+		opts = append(opts, client.WithHost("unix://"+d.socket), client.WithDialContext(d.DialContext))
+	} else {
+		opts = append(opts, client.WithHost(h.URL))
 	}
 	if h.TLS != nil {
 		tc, err := tlsConfig(h.TLS)
@@ -48,9 +61,13 @@ func Open(h config.Host) (*Reader, error) {
 	}
 	c, err := client.New(opts...)
 	if err != nil {
+		if r.ssh != nil {
+			r.ssh.Close()
+		}
 		return nil, fmt.Errorf("docker client: %w", err)
 	}
-	return &Reader{c: c}, nil
+	r.c = c
+	return r, nil
 }
 
 func tlsConfig(t *config.TLS) (*tls.Config, error) {
@@ -76,8 +93,14 @@ func tlsConfig(t *config.TLS) (*tls.Config, error) {
 	return tc, nil
 }
 
-// Close releases the underlying client.
-func (r *Reader) Close() error { return r.c.Close() }
+// Close releases the underlying client and, for ssh:// hosts, the SSH connection.
+func (r *Reader) Close() error {
+	err := r.c.Close()
+	if r.ssh != nil {
+		err = errors.Join(err, r.ssh.Close())
+	}
+	return err
+}
 
 // Version returns the engine version.
 func (r *Reader) Version(ctx context.Context) (string, error) {

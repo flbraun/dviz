@@ -22,7 +22,7 @@ docker run --rm -p 127.0.0.1:8080:8080 \
   dviz
 ```
 
-The image runs as an unprivileged user (`--group-add` grants socket access) and listens on `0.0.0.0:8080` inside the container. To configure it, mount your own file at `/dviz.yml`.
+The image runs as an unprivileged user (`--group-add` grants socket access) and listens on `0.0.0.0:8080` inside the container. To configure it, mount your own file at `/dviz.yml`. The image has no home directory, so for [SSH hosts](#ssh-hosts) mount the `known_hosts` file (and key or password file) and set their paths explicitly.
 
 ## Development
 
@@ -83,14 +83,20 @@ The file is also validated at startup, and an invalid file prevents startup.
 | `hosts` | list | one host: `local` → `unix:///var/run/docker.sock` | Docker daemons to show, one scene each, in this order. An empty or missing list uses the default. |
 | `hosts[].name` | string | — (required) | Stable identifier used in URLs (`#/<name>`). Must match `^[a-z0-9][a-z0-9_-]*$` and be unique. |
 | `hosts[].display_name` | string | `name` | Human-readable label shown in the UI. |
-| `hosts[].url` | string | — (required) | `unix:///path/to/docker.sock` or `tcp://host:port`. |
-| `hosts[].tls` | object | none | Client TLS for `tcp://` hosts. Not allowed with `unix://`. |
+| `hosts[].url` | string | — (required) | `unix:///path/to/docker.sock`, `tcp://host:port`, or `ssh://[user@]host[:port][/path/to/docker.sock]` (see [SSH hosts](#ssh-hosts)). For SSH, the user defaults to the current user, the port to `22` and the remote socket to `/var/run/docker.sock`. Passwords in URLs are rejected. |
+| `hosts[].tls` | object | none | Client TLS for `tcp://` hosts. Not allowed with `unix://` or `ssh://`. |
 | `hosts[].tls.ca` | path | system roots | CA bundle used to verify the daemon. |
 | `hosts[].tls.cert` | path | none | Client certificate. Requires `key`. |
 | `hosts[].tls.key` | path | none | Client private key. Requires `cert`. |
 | `hosts[].tls.insecure_skip_verify` | bool | `false` | Skip server certificate verification. |
+| `hosts[].ssh` | object | — (required for `ssh://`) | Settings for `ssh://` hosts. Only allowed with `ssh://`. |
+| `hosts[].ssh.method` | string | — (required) | How to authenticate: `password`, `agent` or `key`. Only this method is used. |
+| `hosts[].ssh.password` | path | none | File containing the login password (required for `password`), or the passphrase of a protected `identity_file` (optional for `key`). One trailing newline is ignored. Not allowed with `agent`. |
+| `hosts[].ssh.identity_file` | path | none | Private key for method `key` (required there, not allowed otherwise). |
+| `hosts[].ssh.known_hosts` | path | `~/.ssh/known_hosts` | File used to verify the server's host key. |
+| `hosts[].ssh.insecure_ignore_host_key` | bool | `false` | Skip host key verification. |
 
-Unknown keys are rejected. TLS paths may be absolute, start with `~/`, or be relative to the directory containing `dviz.yml`.
+Unknown keys are rejected. TLS and SSH paths may be absolute, start with `~/`, or be relative to the directory containing `dviz.yml`.
 
 ### Examples
 
@@ -120,6 +126,28 @@ hosts:
       key: certs/prod/key.pem
 ```
 
+Remote servers over SSH, verified against `~/.ssh/known_hosts`:
+
+```yaml
+hosts:
+  - name: prod
+    display_name: Prod server
+    url: ssh://deploy@prod.example.com
+    ssh:
+      method: agent                    # keys from the running ssh-agent
+  - name: staging
+    url: ssh://deploy@staging.example.com:2222
+    ssh:
+      method: key
+      identity_file: ~/.ssh/dviz_ed25519
+      password: ~/.config/dviz/staging.passphrase   # only if the key is protected
+  - name: lab
+    url: ssh://admin@lab.local/run/user/1000/docker.sock   # rootless Docker socket
+    ssh:
+      method: password
+      password: ~/.config/dviz/lab.password
+```
+
 Inside the Docker image (mounted at `/dviz.yml`):
 
 ```yaml
@@ -128,6 +156,23 @@ hosts:
   - name: local
     url: unix:///var/run/docker.sock
 ```
+
+### SSH hosts
+
+dviz connects to `ssh://` hosts itself, so it doesn't need the `ssh` binary, and the server doesn't need the docker CLI. It opens the remote Docker socket through SSH socket forwarding, the same mechanism as `ssh -L local.sock:/var/run/docker.sock`. It keeps one SSH connection per host, sends keepalives every 30 seconds, and reconnects automatically when the connection drops.
+
+**Authentication.** Exactly one method is used, set by `ssh.method`. dviz never searches for keys or credentials on its own.
+- `password`: the password is read from the file at `ssh.password`. Keep that file readable only by you (`chmod 600`). The server must allow `PasswordAuthentication`; keyboard-interactive login is not supported.
+- `agent`: dviz uses the keys of the ssh-agent at `$SSH_AUTH_SOCK`, from dviz's environment at the time it connects.
+- `key`: dviz uses the private key at `ssh.identity_file`. For a passphrase-protected key, `ssh.password` names a file holding the passphrase.
+
+**Host key verification.** The server's key must already be listed in `known_hosts`. Connect once with `ssh` to add it.
+- An unknown key or a mismatched key puts the host in an error state, and the error shows the key's fingerprint.
+- `~/.ssh/config` is not read, so aliases, `ProxyJump` and per-host options there don't apply.
+
+**Server requirements:**
+- The SSH user can read and write the remote Docker socket, for example by being in the `docker` group.
+- sshd allows `AllowTcpForwarding` (at least `local`) and `AllowStreamLocalForwarding`. Both default to yes in OpenSSH, but some distributions (for example Alpine) disable TCP forwarding, which also blocks socket forwarding.
 
 ## Reachability
 

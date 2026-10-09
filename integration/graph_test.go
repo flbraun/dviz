@@ -22,7 +22,7 @@ func TestGraphStructure(t *testing.T) {
 	c := daemon(t)
 	ctx := context.Background()
 	project := name(t, "proj")
-	netID := net(t, c, name(t, "graph-net"), nil)
+	netID := netw(t, c, name(t, "graph-net"), nil)
 	vol, err := c.VolumeCreate(ctx, client.VolumeCreateOptions{Name: name(t, "graph-vol"), Labels: labels(nil)})
 	if err != nil {
 		t.Fatal(err)
@@ -155,9 +155,9 @@ func TestReachability(t *testing.T) {
 	c := daemon(t)
 	ctx := context.Background()
 	n1, n2, iso := name(t, "n1"), name(t, "n2"), name(t, "noicc")
-	net(t, c, n1, nil)
-	net(t, c, n2, nil)
-	net(t, c, iso, map[string]string{"com.docker.network.bridge.enable_icc": "false"})
+	netw(t, c, n1, nil)
+	netw(t, c, n2, nil)
+	netw(t, c, iso, map[string]string{"com.docker.network.bridge.enable_icc": "false"})
 
 	on := func(n string, aliases ...string) map[string]*network.EndpointSettings {
 		return map[string]*network.EndpointSettings{n: {Aliases: aliases}}

@@ -43,7 +43,7 @@ func (r *Registry) Apply(hosts []config.Host) {
 		switch {
 		case !exists:
 			r.hubs[h.Name] = newHub(r.ctx, h, r.notify)
-		case old.URL != h.URL || !reflect.DeepEqual(old.TLS, h.TLS):
+		case !sameConnection(old, h):
 			stop = append(stop, r.hubs[h.Name])
 			r.hubs[h.Name] = newHub(r.ctx, h, r.notify)
 		case old.DisplayName != h.DisplayName:
@@ -120,4 +120,11 @@ func (r *Registry) Close() {
 	for _, h := range hubs {
 		h.stop()
 	}
+}
+
+// sameConnection reports whether two configs of a host connect identically, i.e. they
+// differ at most in presentation.
+func sameConnection(a, b config.Host) bool {
+	a.DisplayName = b.DisplayName
+	return reflect.DeepEqual(a, b)
 }

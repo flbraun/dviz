@@ -156,8 +156,8 @@ func run(t *testing.T, c *client.Client, spec ctr) string {
 	return res.ID
 }
 
-// net creates a bridge network and registers its removal (after containers).
-func net(t *testing.T, c *client.Client, n string, opts map[string]string) string {
+// netw creates a bridge network and registers its removal (after containers).
+func netw(t *testing.T, c *client.Client, n string, opts map[string]string) string {
 	t.Helper()
 	res, err := c.NetworkCreate(context.Background(), n, client.NetworkCreateOptions{Driver: "bridge", Options: opts, Labels: labels(nil)})
 	if err != nil {
@@ -556,6 +556,12 @@ func TestMain(m *testing.M) {
 	code := m.Run()
 	if dindContainer != "" && dockerCli != nil {
 		_, _ = dockerCli.ContainerRemove(context.Background(), dindContainer, client.ContainerRemoveOptions{Force: true, RemoveVolumes: true})
+	}
+	if sshdContainer != "" && dockerCli != nil {
+		_, _ = dockerCli.ContainerRemove(context.Background(), sshdContainer, client.ContainerRemoveOptions{Force: true, RemoveVolumes: true})
+	}
+	if sshdVal != nil {
+		_ = os.RemoveAll(sshdVal.Dir)
 	}
 	if dindVal != nil {
 		_ = os.RemoveAll(dindVal.CertDir)
