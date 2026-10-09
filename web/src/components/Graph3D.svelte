@@ -48,13 +48,21 @@
     return n.name;
   }
 
+  const MAX_LABEL = 25;
+
+  /** Label text, ellipsized so long unique identifiers stay readable; hover shows the full name. */
+  function labelText(n: GNode): string {
+    const name = displayName(n);
+    return name.length > MAX_LABEL ? `${name.slice(0, MAX_LABEL)}…` : name;
+  }
+
   function nodeObject(n: GNode): THREE.Object3D {
     let o = objects.get(n);
     if (!o) {
       const mat = new THREE.MeshLambertMaterial({ color: nodeColor(n), transparent: true, opacity: 0.95 });
       const group = new THREE.Group();
       group.add(new THREE.Mesh(geometry(n.kind), mat));
-      const label = new SpriteText(displayName(n), 3, "#e6edf3");
+      const label = new SpriteText(labelText(n), 3, "#e6edf3");
       label.backgroundColor = "rgba(13,17,23,0.7)";
       label.padding = 1;
       label.position.y = n.kind === "host" ? 15 : 8;
@@ -70,9 +78,10 @@
     const lit = !highlight || highlight.has(n.id);
     o.mat.color.set(nodeColor(n));
     o.mat.opacity = lit ? 0.95 : 0.12;
-    o.label.text = displayName(n);
-    o.label.visible =
-      n.id === hovered || (highlight ? highlight.has(n.id) : n.kind === "host" || n.kind === "project" || (n.kind === "network" && app.mode === "topology"));
+    // Setting text re-renders the sprite's canvas, so only do it on change.
+    const text = labelText(n);
+    if (o.label.text !== text) o.label.text = text;
+    o.label.material.opacity = lit || n.id === hovered ? 1 : 0.15;
     const isolated = n.attrs?.["isolated"] === "true";
     if (isolated && !o.ring) {
       o.ring = new THREE.Mesh(new THREE.TorusGeometry(6, 0.5, 8, 32), new THREE.MeshBasicMaterial({ color: "#8b949e" }));
