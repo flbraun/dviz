@@ -1,12 +1,17 @@
 package integration
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/flbraun/dviz/internal/app"
+	"github.com/flbraun/dviz/internal/config"
 	"github.com/flbraun/dviz/internal/docker"
 	"github.com/flbraun/dviz/internal/model"
 )
@@ -171,6 +176,27 @@ func TestConfigResolutionOrder(t *testing.T) {
 		}
 		return ""
 	})
+}
+
+func TestConfigRequired(t *testing.T) {
+	daemon(t)
+	root := t.TempDir()
+	candidates := []string{filepath.Join(root, "a", "dviz.yml"), filepath.Join(root, "b", "dviz.yml")}
+	err := app.Run(context.Background(), app.Options{Candidates: candidates})
+	if !errors.Is(err, config.ErrNoConfig) || !strings.Contains(err.Error(), candidates[1]) {
+		t.Fatalf("start without config: err = %v", err)
+	}
+
+	// Deleting the only config while running keeps the running config.
+	in := start(t, localYAML())
+	in.waitConnected("local")
+	if err := os.Remove(in.candidates[0]); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(1500 * time.Millisecond)
+	if hs := in.hosts(); len(hs) != 1 || hs[0].Name != "local" {
+		t.Errorf("hosts after deleting the config = %+v", hs)
+	}
 }
 
 func TestHostHeaderGuard(t *testing.T) {

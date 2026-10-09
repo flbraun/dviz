@@ -6,23 +6,31 @@ dviz is read-only and ships as a single static binary with the web UI embedded.
 
 ## Quick start
 
-```sh
-./dviz                        # serves http://127.0.0.1:8080 using unix:///var/run/docker.sock
+dviz takes no command-line arguments and has no built-in configuration: it needs a [`dviz.yml`](#configuration) and refuses to start without one. A minimal file for the local daemon:
+
+```yaml
+listen: 127.0.0.1:8080
+hosts:
+  - name: local
+    url: unix:///var/run/docker.sock
 ```
 
-dviz takes no command-line arguments. Everything is configured through [`dviz.yml`](#configuration).
+```sh
+./dviz                        # with dviz.yml in the current directory; serves http://127.0.0.1:8080
+```
 
-With Docker:
+With Docker, mount the config at `/dviz.yml` and set `listen: 0.0.0.0:8080` in it so the published port reaches dviz:
 
 ```sh
 docker build -t dviz .
 docker run --rm -p 127.0.0.1:8080:8080 \
+  -v "$PWD/dviz.yml:/dviz.yml:ro" \
   -v /var/run/docker.sock:/var/run/docker.sock:ro \
   --group-add "$(stat -c %g /var/run/docker.sock)" \
   dviz
 ```
 
-The image runs as an unprivileged user (`--group-add` grants socket access) and listens on `0.0.0.0:8080` inside the container. To configure it, mount your own file at `/dviz.yml`. The image has no home directory, so for [SSH hosts](#ssh-hosts) mount the `known_hosts` file (and key or password file) and set their paths explicitly.
+The image runs as an unprivileged user (`--group-add` grants socket access). The image has no home directory, so for [SSH hosts](#ssh-hosts) mount the `known_hosts` file (and key or password file) and set their paths explicitly.
 
 ## Development
 
@@ -35,7 +43,8 @@ Prerequisites:
 ```sh
 npm --prefix web ci          # install frontend dependencies
 go generate ./web            # build the frontend into web/dist (embedded by go build)
-go run ./cmd/dviz            # API + UI on http://127.0.0.1:8080
+$EDITOR dviz.yml             # required, see Quick start; gitignored in the repo root
+go run ./cmd/dviz            # API + UI on the configured listen address
 npm --prefix web run dev     # optional: Vite dev server with hot reload on :5173, proxies /api to :8080
 ```
 
@@ -64,13 +73,13 @@ dviz reads a single YAML file, `dviz.yml`. It uses the first one it finds in thi
 2. `~/.config/dviz/dviz.yml`
 3. `/etc/dviz/dviz.yml`
 
-Without a file, dviz uses the defaults below: it listens on `127.0.0.1:8080` and connects to `unix:///var/run/docker.sock` as host `local`.
+A config file is required. If none of these locations has one, dviz exits with an error listing the paths it searched. The defaults in the table below only fill in keys that are missing from an existing file.
 
 **Live reload.** dviz watches all three locations and applies changes without a restart:
 - Added hosts connect, and removed hosts disconnect and disappear from the UI.
 - Changing a host's `url` or `tls` reconnects it. Changing `display_name` updates the label in place.
 - Changing `listen` moves the server to the new address. Open browser tabs need to be pointed at it.
-- Creating a file in a higher-priority location makes it take over. Deleting one falls back to the next location.
+- Creating a file in a higher-priority location makes it take over. Deleting one falls back to the next location. Deleting the last one keeps the running config until a valid file appears again.
 - An invalid file is logged and ignored, and the last valid config stays active.
 
 The file is also validated at startup, and an invalid file prevents startup.

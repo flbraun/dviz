@@ -33,11 +33,7 @@ func Run(ctx context.Context, opts Options) error {
 	if err != nil {
 		return err
 	}
-	if cfg.Source != "" {
-		slog.Info("config loaded", "source", cfg.Source)
-	} else {
-		slog.Info("no config file found, using defaults", "searched", opts.Candidates)
-	}
+	slog.Info("config loaded", "source", cfg.Source)
 
 	reg := hub.NewRegistry(ctx)
 	defer reg.Close()

@@ -42,7 +42,7 @@ The integration tests and e2e tests create fixtures labelled `dviz.test.run` / `
 ## Hard rules
 
 - **Never use CGO.** Every build sets `CGO_ENABLED=0`, and the binary must stay statically linked. Only add pure-Go dependencies.
-- **Configure only through `dviz.yml`.** Don't add CLI flags or environment-variable configuration. New settings go into `internal/config`, are validated there, are applied live by the supervisor, and are documented in the README's configuration reference in the same change.
+- **Configure only through `dviz.yml`.** The file is mandatory; never add a built-in fallback config. Don't add CLI flags or environment-variable configuration. New settings go into `internal/config`, are validated there, are applied live by the supervisor, and are documented in the README's configuration reference in the same change.
 - **Keep the app read-only.** Never add endpoints or Reader methods that change daemon state. Every route is GET.
 - **Route every Docker read through `docker.Reader`.** Sanitize every returned value before it leaves `internal/docker`.
   - When you add a Reader method or start using a new field, extend `sanitize.go`.

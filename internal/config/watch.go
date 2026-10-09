@@ -53,6 +53,8 @@ func Watch(ctx context.Context, candidates []string, current *Config, apply func
 	addDirs()
 
 	reload := func() {
+		// A missing file (all candidates deleted) is an error like an invalid one: the
+		// running config stays active until a valid file appears.
 		next, err := Load(candidates)
 		if err != nil {
 			slog.Error("config: reload failed, keeping previous config", "err", err)

@@ -96,13 +96,6 @@ func DefaultCandidates() []string {
 	return append(out, filepath.Join("/etc", "dviz", FileName))
 }
 
-// Default returns the configuration used when no config file exists.
-func Default() *Config {
-	c := &Config{}
-	c.applyDefaults()
-	return c
-}
-
 // Resolve returns the first candidate that exists as a regular file, or "" if none does.
 func Resolve(candidates []string) (string, error) {
 	for _, p := range candidates {
@@ -120,14 +113,18 @@ func Resolve(candidates []string) (string, error) {
 	return "", nil
 }
 
-// Load resolves the config file from candidates and parses it. Without a file it returns Default().
+// ErrNoConfig is returned by Load when none of the candidates exists. A config file is
+// mandatory; there is no built-in fallback configuration.
+var ErrNoConfig = errors.New("no config file found")
+
+// Load resolves the config file from candidates and parses it.
 func Load(candidates []string) (*Config, error) {
 	path, err := Resolve(candidates)
 	if err != nil {
 		return nil, err
 	}
 	if path == "" {
-		return Default(), nil
+		return nil, fmt.Errorf("%w; create %s in one of: %s", ErrNoConfig, FileName, strings.Join(candidates, ", "))
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
