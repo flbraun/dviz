@@ -1,0 +1,95 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    # Full CI (checks, unit, integration and e2e tests) must pass before anything is published.
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
+  binaries:
+    needs: ci
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      CGO_ENABLED: "0"
+      VERSION: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: Build frontend
+        run: npm --prefix web ci && npm --prefix web run build
+      - name: Build binaries
+        run: |
+          mkdir -p dist
+          for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do
+            os=${target%/*}; arch=${target#*/}
+            name="dviz_${VERSION}_${os}_${arch}"
+            mkdir -p "build/$name"
+            GOOS=$os GOARCH=$arch go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o "build/$name/dviz" ./cmd/dviz
+            cp LICENSE README.md "build/$name/"
+            tar -C build -czf "dist/$name.tar.gz" "$name"
+          done
+          (cd dist && sha256sum *.tar.gz > checksums.txt)
+          file build/*/dviz
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          prerelease=""
+          [[ "$VERSION" == *-* ]] && prerelease="--prerelease"
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            gh release upload "$VERSION" dist/* --clobber
+          else
+            gh release create "$VERSION" dist/* --verify-tag --generate-notes --title "$VERSION" $prerelease
+          fi
+
+  image:
+    needs: ci
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      VERSION: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Log in to ghcr.io
+        run: echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: Build and push multi-arch image
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          version="${VERSION#v}"
+          tags=(-t "$image:$version")
+          # Stable releases (no "-pre" suffix) also move the major, minor and latest tags.
+          if [[ "$version" =~ ^([0-9]+)\.([0-9]+)\.[0-9]+$ ]]; then
+            tags+=(-t "$image:${BASH_REMATCH[1]}.${BASH_REMATCH[2]}" -t "$image:${BASH_REMATCH[1]}" -t "$image:latest")
+          fi
+          docker buildx create --use --driver docker-container
+          docker buildx build . --push \
+            --platform linux/amd64,linux/arm64 \
+            --build-arg VERSION="$VERSION" \
+            "${tags[@]}" \
+            --label org.opencontainers.image.source="${{ github.server_url }}/${{ github.repository }}" \
+            --label org.opencontainers.image.version="$version" \
+            --label org.opencontainers.image.revision="${{ github.sha }}" \
+            --label org.opencontainers.image.description="Interactive 3D view of Docker hosts"

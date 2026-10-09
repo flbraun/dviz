@@ -4,6 +4,27 @@ dviz connects to one or more Docker daemons and shows what runs on them as an in
 
 dviz is read-only and ships as a single static binary with the web UI embedded.
 
+## Installation
+
+**Binaries.** Every [release](https://github.com/flbraun/dviz/releases) has archives for Linux and macOS on x86-64 (`amd64`) and ARM (`arm64`), plus `checksums.txt`:
+
+```sh
+VERSION=v1.0.0 OS=linux ARCH=amd64     # OS: linux or darwin; ARCH: amd64 or arm64
+curl -fsSLO "https://github.com/flbraun/dviz/releases/download/$VERSION/dviz_${VERSION}_${OS}_${ARCH}.tar.gz"
+curl -fsSL "https://github.com/flbraun/dviz/releases/download/$VERSION/checksums.txt" | sha256sum --ignore-missing -c
+tar -xzf "dviz_${VERSION}_${OS}_${ARCH}.tar.gz" && sudo install "dviz_${VERSION}_${OS}_${ARCH}/dviz" /usr/local/bin/
+```
+
+On macOS, use `shasum -a 256 --ignore-missing -c` instead of `sha256sum`. macOS has no `xdg-open`, so set `headless: true` (dviz otherwise only logs a warning at startup) and open the URL yourself.
+
+**Docker image.** Multi-arch images (`linux/amd64`, `linux/arm64`) are published to the GitHub Container Registry:
+
+```sh
+docker pull ghcr.io/flbraun/dviz:latest      # or a release version, e.g. :1.0.0, :1.0, :1
+```
+
+See [Quick start](#quick-start) for how to run it.
+
 ## Quick start
 
 dviz takes no command-line arguments and has no built-in configuration: it needs a [`dviz.yml`](#configuration) and refuses to start without one. A minimal file for the local daemon:
@@ -24,13 +45,14 @@ On start, dviz opens the UI in a new browser tab via `xdg-open`; set `headless: 
 With Docker, mount the config at `/dviz.yml` and set `listen: 0.0.0.0:8080` (so the published port reaches dviz) and `headless: true` (there is no browser in the container) in it:
 
 ```sh
-docker build -t dviz .
 docker run --rm -p 127.0.0.1:8080:8080 \
   -v "$PWD/dviz.yml:/dviz.yml:ro" \
   -v /var/run/docker.sock:/var/run/docker.sock:ro \
   --group-add "$(stat -c %g /var/run/docker.sock)" \
-  dviz
+  ghcr.io/flbraun/dviz:latest
 ```
+
+To build the image yourself instead, run `docker build -t dviz .`.
 
 The image runs as an unprivileged user (`--group-add` grants socket access). The image has no home directory, so for [SSH hosts](#ssh-hosts) mount the `known_hosts` file (and key or password file) and set their paths explicitly.
 
@@ -59,6 +81,13 @@ go vet ./... && go test ./...               # Go; integration tests need Docker,
 npx --prefix web playwright install chromium
 npm --prefix web run e2e                    # Playwright against the real binary, local daemon and dind
 ```
+
+**Releases.** Pushing a tag `vX.Y.Z` runs `.github/workflows/release.yml`:
+1. It runs the full CI first.
+2. It builds the four binaries and attaches them to a GitHub release for the tag.
+3. It pushes the image to `ghcr.io/flbraun/dviz` as `X.Y.Z`, `X.Y`, `X` and `latest`.
+
+Tags with a suffix (`v1.2.0-rc.1`) become prereleases and only get their exact image tag.
 
 Production build (always static, never CGO):
 

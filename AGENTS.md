@@ -37,6 +37,8 @@ npm --prefix web run check && npm --prefix web test       # svelte-check + vites
 npm --prefix web run e2e                                 # Playwright (needs Docker, Chromium)
 ```
 
+Releases are cut by pushing a `vX.Y.Z` tag (see `.github/workflows/release.yml`; it calls `ci.yml` first). Keep release builds stamping `-X main.version`.
+
 The integration tests and e2e tests create fixtures labelled `dviz.test.run` / `dviz.e2e.run`. They also start a privileged `docker:dind` container (second tcp+TLS host) and an Alpine `sshd` container that exposes the local socket (SSH host). They clean up after themselves.
 
 ## Hard rules

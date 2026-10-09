@@ -17,6 +17,9 @@ import (
 	"github.com/flbraun/dviz/web"
 )
 
+// version is set at release build time via -ldflags "-X main.version=...".
+var version = "dev"
+
 func main() {
 	if len(os.Args) > 1 {
 		fmt.Fprintln(os.Stderr, "dviz takes no arguments; configure it via dviz.yml in:")
@@ -26,6 +29,7 @@ func main() {
 		os.Exit(2)
 	}
 
+	slog.Info("starting dviz", "version", version)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
